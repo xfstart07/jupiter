@@ -78,7 +78,9 @@ func (reg *etcdv3Registry) UnregisterService(ctx context.Context, info *server.S
 
 // ListServices list service registered in registry with name `name`
 func (reg *etcdv3Registry) ListServices(ctx context.Context, name string, scheme string) (services []*server.ServiceInfo, err error) {
+	// 服务信息key的前缀
 	target := fmt.Sprintf("/%s/%s/providers/%s://", reg.Prefix, name, scheme)
+	// 获取相关前缀的所有信息
 	getResp, getErr := reg.client.Get(ctx, target, clientv3.WithPrefix())
 	if getErr != nil {
 		reg.logger.Error(ecode.MsgWatchRequestErr, xlog.FieldErrKind(ecode.ErrKindRequestErr), xlog.FieldErr(getErr), xlog.FieldAddr(target))
@@ -100,6 +102,7 @@ func (reg *etcdv3Registry) ListServices(ctx context.Context, name string, scheme
 // WatchServices watch service change event, then return address list
 func (reg *etcdv3Registry) WatchServices(ctx context.Context, name string, scheme string) (chan registry.Endpoints, error) {
 	prefix := fmt.Sprintf("/%s/%s/", reg.Prefix, name)
+	// 通过etcd客户端创建一个监控通道
 	watch, err := reg.client.WatchPrefix(context.Background(), prefix)
 	if err != nil {
 		return nil, err
@@ -117,11 +120,10 @@ func (reg *etcdv3Registry) WatchServices(ctx context.Context, name string, schem
 		updateAddrList(al, prefix, scheme, kv)
 	}
 
-	// var snapshot registry.Endpoints
-	// xstruct.CopyStruct(al, &snapshot)
 	addresses <- *al.DeepCopy()
 
 	xgo.Go(func() {
+		// 不断接收etcd发送过来的变动事件
 		for event := range watch.C() {
 			switch event.Type {
 			case mvccpb.PUT:
@@ -130,13 +132,11 @@ func (reg *etcdv3Registry) WatchServices(ctx context.Context, name string, schem
 				deleteAddrList(al, prefix, scheme, event.Kv)
 			}
 
-			// var snapshot registry.Endpoints
-			// xstruct.CopyStruct(al, &snapshot)
 			out := al.DeepCopy()
 			fmt.Printf("al => %p\n", al.Nodes)
 			fmt.Printf("snapshot => %p\n", out.Nodes)
 			select {
-			// case addresses <- snapshot:
+			// 将更新后的服务信息发送出去，接收方是 resolver
 			case addresses <- *out:
 			default:
 				xlog.Warnf("invalid")
@@ -144,9 +144,11 @@ func (reg *etcdv3Registry) WatchServices(ctx context.Context, name string, schem
 		}
 	})
 
+	// 返回一个地址通道，用于传递
 	return addresses, nil
 }
 
+// 删除服务
 func (reg *etcdv3Registry) unregister(ctx context.Context, key string) error {
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
@@ -154,10 +156,12 @@ func (reg *etcdv3Registry) unregister(ctx context.Context, key string) error {
 		defer cancel()
 	}
 
+	// 接触租约
 	if err := reg.delSession(key); err != nil {
 		return err
 	}
 
+	// 删除服务信息
 	_, err := reg.client.Delete(ctx, key)
 	if err == nil {
 		reg.kvs.Delete(key)
@@ -227,6 +231,8 @@ func (reg *etcdv3Registry) registerMetric(ctx context.Context, info *server.Serv
 	return nil
 
 }
+
+// 业务信息注册
 func (reg *etcdv3Registry) registerBiz(ctx context.Context, info *server.ServiceInfo) error {
 	var readCtx context.Context
 	var readCancel context.CancelFunc
@@ -238,6 +244,7 @@ func (reg *etcdv3Registry) registerBiz(ctx context.Context, info *server.Service
 	key := reg.registerKey(info)
 	val := reg.registerValue(info)
 
+	// 设置租约机制
 	opOptions := make([]clientv3.OpOption, 0)
 	// opOptions = append(opOptions, clientv3.WithSerializable())
 	if ttl := reg.Config.ServiceTTL.Seconds(); ttl > 0 {
@@ -248,6 +255,8 @@ func (reg *etcdv3Registry) registerBiz(ctx context.Context, info *server.Service
 		}
 		opOptions = append(opOptions, clientv3.WithLease(sess.Lease()))
 	}
+
+	// 提交信息到 etcd
 	_, err := reg.client.Put(readCtx, key, val, opOptions...)
 	if err != nil {
 		reg.logger.Error("register service", xlog.FieldErrKind(ecode.ErrKindRegisterErr), xlog.FieldErr(err), xlog.FieldKeyAny(key), xlog.FieldValueAny(info))

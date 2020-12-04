@@ -34,11 +34,12 @@ func Register(name string, reg registry.Registry) {
 
 type baseBuilder struct {
 	name string
-	reg  registry.Registry
+	reg  registry.Registry // 服务发送与注册模块的接口
 }
 
 // Build ...
 func (b *baseBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
+	// 从 Registry 模块获得监控服务通道
 	endpoints, err := b.reg.WatchServices(context.Background(), target.Endpoint, "grpc")
 	if err != nil {
 		return nil, err
@@ -47,6 +48,7 @@ func (b *baseBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts
 	var stop = make(chan struct{})
 	xgo.Go(func() {
 		for {
+			// 不断轮询 endpoints 通道，获得最新的服务信息
 			select {
 			case endpoint := <-endpoints:
 				var state = resolver.State{
@@ -64,6 +66,8 @@ func (b *baseBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts
 					address.Attributes = attributes.New(constant.KeyServiceInfo, node)
 					state.Addresses = append(state.Addresses, address)
 				}
+
+				// 将服务地址信息更新到grpc client 中。
 				cc.UpdateState(state)
 			case <-stop:
 				return
