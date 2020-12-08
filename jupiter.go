@@ -59,20 +59,21 @@ const (
 
 // Application is the framework's instance, it contains the servers, workers, client and configuration settings.
 // Create an instance of Application, by using &Application{}
+// Jupiter 框架的入口结构体
 type Application struct {
-	cycle        *xcycle.Cycle
+	cycle        *xcycle.Cycle  // 一些管理运行生命周期的函数管理
 	smu          *sync.RWMutex
 	initOnce     sync.Once
 	startupOnce  sync.Once
 	stopOnce     sync.Once
-	servers      []server.Server
-	workers      []worker.Worker
-	jobs         map[string]job.Runner
-	logger       *xlog.Logger
-	registerer   registry.Registry
+	servers      []server.Server    // 各种服务，http, grpc 等
+	workers      []worker.Worker  // 任务
+	jobs         map[string]job.Runner  // 任务
+	logger       *xlog.Logger // 日志对象
+	registerer   registry.Registry  // 服务注册接口对象
 	hooks        map[uint32]*xdefer.DeferStack
-	configParser conf.Unmarshaller
-	disableMap   map[Disable]bool
+	configParser conf.Unmarshaller // 系统配置对象
+	disableMap   map[Disable]bool // 禁用功能的配置
 	HideBanner   bool
 }
 
@@ -158,12 +159,14 @@ func (app *Application) startup() (err error) {
 	return
 }
 
-//Startup ..
+//Startup 应用启动前的初始化工作方法
 func (app *Application) Startup(fns ...func() error) error {
-	app.initialize()
+	app.initialize() // 初始化 app 的各个字段
+	// 执行框架定义的初始化方法
 	if err := app.startup(); err != nil {
 		return err
 	}
+	// 执行自定义的初始化方法
 	return xgo.SerialUntilError(fns...)()
 }
 
@@ -340,6 +343,7 @@ func (app *Application) GracefulStop(ctx context.Context) (err error) {
 }
 
 // waitSignals wait signal
+// 注册捕获退出系统信号的函数
 func (app *Application) waitSignals() {
 	app.logger.Info("init listen signal", xlog.FieldMod(ecode.ModApp), xlog.FieldEvent("init"))
 	signals.Shutdown(func(grace bool) { //when get shutdown signal

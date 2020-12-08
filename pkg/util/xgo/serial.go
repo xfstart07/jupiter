@@ -19,6 +19,7 @@ import (
 )
 
 // SerialWithError ...
+// 串行化运行
 func SerialWithError(fns ...func() error) func() error {
 	return func() error {
 		var errs error

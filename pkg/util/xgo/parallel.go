@@ -21,6 +21,7 @@ import (
 )
 
 // ParallelWithError ...
+// 并发运行
 func ParallelWithError(fns ...func() error) func() error {
 	return func() error {
 		eg := errgroup.Group{}

@@ -125,6 +125,7 @@ func (reg *etcdv3Registry) WatchServices(ctx context.Context, name string, schem
 	xgo.Go(func() {
 		// 不断接收etcd发送过来的变动事件
 		for event := range watch.C() {
+			// 判断事件的类型，etcd 的两种类型更新和删除
 			switch event.Type {
 			case mvccpb.PUT:
 				updateAddrList(al, prefix, scheme, event.Kv)
