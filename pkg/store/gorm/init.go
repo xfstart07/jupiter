@@ -21,6 +21,7 @@ func init() {
 	var rets = gormStatus{
 		Gorms: make(map[string]interface{}, 0),
 	}
+	// 为 governor 服务添加 gorm 监控接口
 	governor.HandleFunc("/debug/gorm/stats", func(w http.ResponseWriter, r *http.Request) {
 		rets.Gorms = Stats()
 		_ = jsoniter.NewEncoder(w).Encode(rets)
@@ -30,6 +31,7 @@ func init() {
 
 func monitor() {
 	for {
+		// 每 10 秒钟上报一次信息
 		time.Sleep(time.Second * 10)
 		Range(func(name string, db *DB) bool {
 			stats := db.DB().Stats()

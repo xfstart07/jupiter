@@ -26,15 +26,16 @@ import (
 	"github.com/douyu/jupiter/pkg/xlog"
 )
 
-// Handler ...
+// Handler 处理过程函数类型
 type Handler func(*Scope)
 
-// Interceptor ...
+// Interceptor 拦截器函数类型
 type Interceptor func(*DSN, string, *Config) func(next Handler) Handler
 
 func debugInterceptor(dsn *DSN, op string, options *Config) func(Handler) Handler {
 	return func(next Handler) Handler {
 		return func(scope *Scope) {
+			// FIXME: 将打印移到 netx 方法之后，因为在 netx 方法之前，scope.SQL 并不会有内容，无法打印 sql 语句
 			fmt.Printf("%-50s[%s] => %s\n", xcolor.Green(dsn.Addr+"/"+dsn.DBName), time.Now().Format("04:05.000"), xcolor.Green("Send: "+logSQL(scope.SQL, scope.SQLVars, true)))
 			next(scope)
 			if scope.HasError() {

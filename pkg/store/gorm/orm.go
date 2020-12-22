@@ -76,13 +76,13 @@ var (
 	ErrUnaddressable = gorm.ErrUnaddressable
 )
 
-// WithContext ...
+// WithContext 将 context 添加到 db 实例中
 func WithContext(ctx context.Context, db *DB) *DB {
 	db.InstantSet("_context", ctx)
 	return db
 }
 
-// Open ...
+// Open 建立数据库连接
 func Open(dialect string, options *Config) (*DB, error) {
 	inner, err := gorm.Open(dialect, options.DSN)
 	if err != nil {
@@ -102,6 +102,7 @@ func Open(dialect string, options *Config) (*DB, error) {
 		inner.LogMode(true)
 	}
 
+	// 替换原操作回调函数
 	replace := func(processor func() *gorm.CallbackProcessor, callbackName string, interceptors ...Interceptor) {
 		old := processor().Get(callbackName)
 		var handler = old
@@ -111,6 +112,7 @@ func Open(dialect string, options *Config) (*DB, error) {
 		processor().Replace(callbackName, handler)
 	}
 
+	// 为数据库各个操作加入拦截器
 	replace(
 		inner.Callback().Delete,
 		"gorm:delete",

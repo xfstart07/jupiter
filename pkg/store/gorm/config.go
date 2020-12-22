@@ -109,9 +109,10 @@ func (config *Config) WithInterceptor(intes ...Interceptor) *Config {
 	return config
 }
 
-// Build ...
+// Build 构建 DB 对象
 func (config *Config) Build() *DB {
 	var err error
+	// 解析 db url
 	config.dsnCfg, err = ParseDSN(config.DSN)
 	if err == nil {
 		config.logger.Info(ecode.MsgClientMysqlOpenStart, xlog.FieldMod("gorm"), xlog.FieldAddr(config.dsnCfg.Addr), xlog.FieldName(config.dsnCfg.DBName))
@@ -119,6 +120,7 @@ func (config *Config) Build() *DB {
 		config.logger.Panic(ecode.MsgClientMysqlOpenStart, xlog.FieldMod("gorm"), xlog.FieldErr(err))
 	}
 
+	// 根据配置设置拦截器
 	if config.Debug {
 		config = config.WithInterceptor(debugInterceptor)
 	}
@@ -130,6 +132,7 @@ func (config *Config) Build() *DB {
 		config = config.WithInterceptor(metricInterceptor)
 	}
 
+	// 创建数据库连接
 	db, err := Open("mysql", config)
 	if err != nil {
 		if config.OnDialError == "panic" {
