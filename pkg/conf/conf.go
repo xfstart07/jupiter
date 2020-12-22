@@ -36,7 +36,7 @@ type Configuration struct {
 	keyDelim string
 
 	keyMap    *sync.Map
-	onChanges []func(*Configuration)
+	onChanges []func(*Configuration) // 配置变化回调函数
 
 	watchers map[string][]func(*Configuration)
 }
@@ -82,21 +82,24 @@ func (c *Configuration) OnChange(fn func(*Configuration)) {
 
 // LoadFromDataSource ...
 func (c *Configuration) LoadFromDataSource(ds DataSource, unmarshaller Unmarshaller) error {
+	// 从数据源读取配置内容
 	content, err := ds.ReadConfig()
 	if err != nil {
 		return err
 	}
 
+	// 解析配置内容
 	if err := c.Load(content, unmarshaller); err != nil {
 		return err
 	}
 
+	// 检测数据源是否变更
 	go func() {
 		for range ds.IsConfigChanged() {
 			if content, err := ds.ReadConfig(); err == nil {
 				_ = c.Load(content, unmarshaller)
 				for _, change := range c.onChanges {
-					change(c)
+					change(c) // 调用变更回调函数
 				}
 			}
 		}

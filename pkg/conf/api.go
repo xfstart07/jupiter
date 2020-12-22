@@ -20,7 +20,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-// DataSource ...
+// DataSource 数据源接口
 type DataSource interface {
 	ReadConfig() ([]byte, error)
 	IsConfigChanged() <-chan struct{}
