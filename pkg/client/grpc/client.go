@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// newGRPCClient 创建 grpc 客户端
 func newGRPCClient(config *Config) *grpc.ClientConn {
 	var ctx = context.Background()
 	var dialOptions = config.dialOptions
@@ -46,8 +47,10 @@ func newGRPCClient(config *Config) *grpc.ClientConn {
 		dialOptions = append(dialOptions, grpc.WithKeepaliveParams(*config.KeepAlive))
 	}
 
+	// 设置负载均衡类型
 	dialOptions = append(dialOptions, grpc.WithBalancerName(config.BalancerName))
 
+	// grpc连接
 	cc, err := grpc.DialContext(ctx, config.Address, dialOptions...)
 
 	if err != nil {

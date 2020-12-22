@@ -41,10 +41,11 @@ type Client struct {
 // New ...
 func newClient(config *Config) *Client {
 	conf := clientv3.Config{
-		Endpoints:            config.Endpoints,
-		DialTimeout:          config.ConnectTimeout,
+		Endpoints:            config.Endpoints, // 集群地址
+		DialTimeout:          config.ConnectTimeout, // 连接超时
 		DialKeepAliveTime:    10 * time.Second,
 		DialKeepAliveTimeout: 3 * time.Second,
+		// grpc 连接配置
 		DialOptions: []grpc.DialOption{
 			grpc.WithBlock(),
 			grpc.WithUnaryInterceptor(grpcprom.UnaryClientInterceptor),
@@ -162,13 +163,15 @@ func (client *Client) GetValues(ctx context.Context, keys ...string) (map[string
 	var (
 		firstRevision = int64(0)
 		vars          = make(map[string]string)
-		maxTxnOps     = 128
+		maxTxnOps     = 128 // 最大的提交数
 		getOps        = make([]string, 0, maxTxnOps)
 	)
 
+	// 具体的事务查询处理方法
 	doTxn := func(ops []string) error {
 		txnOps := make([]clientv3.Op, 0, maxTxnOps)
 
+		// 添加查询操作
 		for _, k := range ops {
 			txnOps = append(txnOps, clientv3.OpGet(k,
 				clientv3.WithPrefix(),
@@ -176,10 +179,12 @@ func (client *Client) GetValues(ctx context.Context, keys ...string) (map[string
 				clientv3.WithRev(firstRevision)))
 		}
 
+		// 提交事务
 		result, err := client.Txn(ctx).Then(txnOps...).Commit()
 		if err != nil {
 			return err
 		}
+		// 处理返回的结果
 		for i, r := range result.Responses {
 			originKey := ops[i]
 			originKeyFixed := originKey
@@ -193,12 +198,15 @@ func (client *Client) GetValues(ctx context.Context, keys ...string) (map[string
 				}
 			}
 		}
+		// 获取修订的最新版本号
 		if firstRevision == 0 {
 			firstRevision = result.Header.GetRevision()
 		}
 		return nil
 	}
+
 	for _, key := range keys {
+		// 添加需要提交的key，同时判断是否到达最大提交数，到达则提交进行事务查询
 		getOps = append(getOps, key)
 		if len(getOps) >= maxTxnOps {
 			if err := doTxn(getOps); err != nil {
@@ -207,6 +215,7 @@ func (client *Client) GetValues(ctx context.Context, keys ...string) (map[string
 			getOps = getOps[:0]
 		}
 	}
+	// 判断是否存在还未提交的 key，有则进行查询
 	if len(getOps) > 0 {
 		if err := doTxn(getOps); err != nil {
 			return vars, err

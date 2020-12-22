@@ -46,8 +46,9 @@ func (w *Watch) IncipientKeyValues() []*mvccpb.KeyValue {
 	return w.incipientKVs
 }
 
-// NewWatch ...
+// NewWatch 创建持续监控
 func (client *Client) WatchPrefix(ctx context.Context, prefix string) (*Watch, error) {
+	// 首先获取现有的 key/value 信息
 	resp, err := client.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
@@ -62,6 +63,7 @@ func (client *Client) WatchPrefix(ctx context.Context, prefix string) (*Watch, e
 	xgo.Go(func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		w.cancel = cancel
+		// 创建监控通道
 		rch := client.Client.Watch(ctx, prefix, clientv3.WithPrefix(), clientv3.WithCreatedNotify(), clientv3.WithRev(w.revision))
 		for {
 			for n := range rch {
@@ -75,6 +77,7 @@ func (client *Client) WatchPrefix(ctx context.Context, prefix string) (*Watch, e
 					xlog.Error(ecode.MsgWatchRequestErr, xlog.FieldErrKind(ecode.ErrKindRegisterErr), xlog.FieldErr(err), xlog.FieldAddr(prefix))
 					continue
 				}
+				// 循环向上层发送事件信息
 				for _, ev := range n.Events {
 					select {
 					case w.eventChan <- ev:
